@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default: deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users — can only read/write own document
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId
+        // Only allow updating safe fields from client
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['name', 'avatarUrl', 'subscriptionStatus', 'dailyAiMessages', 'dailySummaries', 'dailyPracticeSessions', 'updatedAt', 'lastLoginAt']);
+    }
+
+    // Projects — user must own
+    match /projects/{projectId} {
+      allow read, write: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Conversations — user must own via project
+    match /conversations/{conversationId} {
+      allow read, write: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Messages — user must own via conversation
+    match /messages/{messageId} {
+      allow read, write: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Bookmarked questions — user must own
+    match /bookmarkedQuestions/{bookmarkId} {
+      allow read, write: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Notes — user must own
+    match /notes/{noteId} {
+      allow read, write: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Study plans — user must own
+    match /studyPlans/{planId} {
+      allow read, write: if request.auth != null
+        && resource.data.projectId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.projects;
+      allow create: if request.auth != null;
+    }
+
+    // Study plan tasks — user must own
+    match /studyPlanTasks/{taskId} {
+      allow read, write: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Practice sessions — user must own
+    match /practiceSessions/{sessionId} {
+      allow read, write: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Subscriptions — user must own
+    match /subscriptions/{subId} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null;
+      // No client-side updates — only via Admin SDK
+    }
+  }
+}
